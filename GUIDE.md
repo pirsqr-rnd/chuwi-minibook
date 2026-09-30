@@ -316,12 +316,23 @@ consoles or login screen.
 
 #### Login screen (greetd + noctalia-greeter)
 
-None of the methods above reach the login screen -- it runs as its own,
-separate process before your compositor session even starts. SDDM's default
-X11 greeter has no rotation of its own, and getting its Wayland mode working
-is more trouble than it's worth on this panel (see the aside at the end of
-this section). `greetd` + `noctalia-greeter` is the setup that ended up
-working reliably.
+The static rotation methods above (kernel cmdline, VBT patch) reach the login
+screen automatically -- they set the DRM `panel orientation` property, which
+any DRM client honors regardless of what's running yet, greeter included.
+Confirmed live: disabling the manual `transforms` override below made no
+difference, the greeter stayed correctly rotated.
+
+What does *not* reach the login screen is the iio-sensor-proxy dynamic
+rotation -- it is a userspace daemon that only starts inside your desktop
+session, well after `greetd` has already rendered its first frame. If you
+rely on the proxy alone, with no static rotation applied, the login screen
+needs its own config, which is why `noctalia-greeter`'s `greeter.toml`
+supports rotation directly (see below).
+
+SDDM's default X11 greeter has no rotation of its own, and getting its
+Wayland mode working is more trouble than it's worth on this panel (see the
+aside at the end of this section). `greetd` + `noctalia-greeter` is the setup
+that ended up working reliably.
 
 **Prerequisite: `seatd`.** Without it, switching VTs between the greeter and
 an already-running Niri session can wedge Niri's DRM output permanently --
