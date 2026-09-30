@@ -11,7 +11,10 @@ collects everything that needs fixing.
 
 **`sudo tools/check-status.sh`** — general system and component status: DMI and
 BIOS info, kernel cmdline, VBT refresh rate, build prerequisites, DKMS module
-state, thermald and iio-sensor-proxy services.
+state, thermald and iio-sensor-proxy services. The VBT refresh rate check needs
+`intel_vbt_decode`, provided by `intel-gpu-tools`
+(`sudo pacman -S intel-gpu-tools`); without it that line reads
+`skipped (intel_vbt_decode not found)`.
 
 **`sudo tools/dptf-status.sh`** — DPTF and thermals: dptf_enabler and the
 int340x driver stack, DPTF participants and thermal zones, RAPL power limits,
