@@ -22,8 +22,12 @@ results.
 
 ## Getting started
 
-See [GUIDE.md](GUIDE.md) for instructions on how to set up and install each
-individual component and tweak.
+See [GUIDE.md](GUIDE.md) for the standard setup and
+[GUIDE-ADVANCED.md](GUIDE-ADVANCED.md) for manual per-component installation,
+GPU setup and display rotation details.
+
+NixOS users can install the complete stack, or select individual fixes, with
+the repository flake. See [tools/nix/NIXOS.md](tools/nix/NIXOS.md).
 
 ## Components
 
@@ -79,7 +83,8 @@ sensor buses.
 | [thermald](docs/thermald.md)                 | Patched thermal daemon: PID control, power limits, DPTF table fixes                          |
 | [iio-sensor-proxy](docs/iio-sensor-proxy.md) | Dual-accelerometer driver: hinge angle, screen rotation, tablet mode                         |
 | [VBT patcher](docs/vbt-patch.md)             | DSI panel refresh rate patcher and update-vbt-clock script                                   |
-| [Installation guide](GUIDE.md)               | Status check, install instructions, GPU setup, BIOS tweaks                                   |
+| [Installation guide](GUIDE.md)               | Standard setup: bootstrap script, BIOS tweaks, thermald                                       |
+| [Advanced guide](GUIDE-ADVANCED.md)          | Status scripts, manual install, GPU setup, display rotation, sleep modes                      |
 
 ## License
 

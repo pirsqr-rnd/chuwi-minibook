@@ -55,6 +55,7 @@ This applies to:
 
 ## Documentation
 
-All documentation in `docs/` and the top-level `README.md`, `GUIDE.md` and this
+All documentation in `docs/` and the top-level `README.md`, `GUIDE.md`,
+`GUIDE-ADVANCED.md` and this
 file are licensed under
 **[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)**.

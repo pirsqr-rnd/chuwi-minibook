@@ -100,14 +100,14 @@ check_vulkan() {
     print_field "decode" "${decode}"
   else
     print_field "decode" "<none>"
-    add_warning "vulkan decode not enabled -- see GUIDE.md"
+    add_warning "vulkan decode not enabled -- see GUIDE-ADVANCED.md"
   fi
 
   if [[ -n "${encode}" ]]; then
     print_field "encode" "${encode}"
   else
     print_field "encode" "<none>"
-    add_warning "vulkan encode not enabled -- see GUIDE.md"
+    add_warning "vulkan encode not enabled -- see GUIDE-ADVANCED.md"
   fi
 }
 
@@ -156,7 +156,7 @@ check_vaapi() {
 
   if [[ -z "${driver}" ]]; then
     print_field "driver" "NOT AVAILABLE"
-    add_warning "va-api driver not found -- see GUIDE.md"
+    add_warning "va-api driver not found -- see GUIDE-ADVANCED.md"
     return
   fi
 
@@ -200,7 +200,7 @@ check_opencl() {
     print_field "device" "${devices//$'\n'/, }"
   else
     print_field "device" "NOT AVAILABLE"
-    add_warning "opencl not available -- see GUIDE.md"
+    add_warning "opencl not available -- see GUIDE-ADVANCED.md"
   fi
 }
 

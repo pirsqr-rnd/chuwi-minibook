@@ -25,7 +25,34 @@ The fork source lives in `iio-sensor-proxy/`.
 
 ## Install
 
-See [GUIDE.md](../GUIDE.md#7-iio-sensor-proxy).
+The bootstrap scripts install it (see [GUIDE.md](../GUIDE.md)); for manual
+steps see [GUIDE-ADVANCED.md](../GUIDE-ADVANCED.md#4-iio-sensor-proxy).
+
+## Desktop integration
+
+The proxy exposes orientation on D-Bus (`net.hadess.SensorProxy`). How that
+becomes a screen rotation depends on your desktop:
+
+- **GNOME and KDE Plasma (Wayland)**: built-in. Enable auto-rotate in the
+  quick-settings panel / System Settings. No extra daemon needed.
+- **Niri**: install [`iio-niri`](https://github.com/Zhaith-Izaliel/iio-niri)
+  and add to one of your Niri config files (e.g.
+  `~/.config/niri/cfg/autostart.kdl`):
+  ```
+  spawn-at-startup "iio-niri" "listen" "--monitor" "DSI-1"
+  ```
+- **Sway / wlroots compositors**: use
+  [`iio-sway`](https://github.com/okeri/iio-sway) (works on Sway, river,
+  Wayfire) or an equivalent bridge for your compositor.
+- **Hyprland**: use
+  [`iio-hyprland`](https://github.com/JeanSchoeller/iio-hyprland).
+
+The patched proxy reports `right-up` whenever the device is in laptop mode, so
+the compositor applies the 270° portrait correction dynamically and switches
+to live accelerometer rotation in tablet mode. A static rotation (kernel
+cmdline, VBT patch, xrandr) does not stack with this — the proxy detects and
+subtracts it, see
+[GUIDE-ADVANCED.md](../GUIDE-ADVANCED.md#display-rotation).
 
 ## Lazy polling (`--lazy`)
 
@@ -127,7 +154,8 @@ sample goes through:
    orientation events (e.g. via `iio-niri`) applies a 270° rotation in laptop
    mode and follows the accelerometer once the lid folds past the tablet
    threshold. This removes the need for a separate static rotation fix (kernel
-   cmdline, VBT patch, xrandr); see [GUIDE.md](../GUIDE.md#display-rotation).
+   cmdline, VBT patch, xrandr); see
+   [GUIDE-ADVANCED.md](../GUIDE-ADVANCED.md#display-rotation).
 
    Folding back to laptop mode emits the landscape orientation directly, instead
    of waiting for the accelerometer pipeline to settle. Compositors that only
@@ -139,3 +167,10 @@ sample goes through:
    from every reported orientation, so the dynamic and static rotations do not
    stack. The detected orientation is logged at startup (`grep 'panel
    orientation'` in the journal).
+
+## Known issues
+
+Per https://github.com/fstanis/chuwi-minibook/issues/10#issuecomment-5690525031
+there's [a known issue](https://gitlab.gnome.org/GNOME/mutter/-/issues/4650) in
+[Mutter](https://mutter.gnome.org) which applies the wrong rotation when
+returning from tablet mode back into laptop mode.

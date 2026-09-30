@@ -22,13 +22,13 @@ ______________________________________________________________________
 
 ## Install
 
-See [GUIDE.md](../GUIDE.md#6-thermald). The service unit runs
+See [GUIDE.md](../GUIDE.md#3-thermald). The service unit runs
 `thermald --systemd --dbus-enable --adaptive`; this build requires `--adaptive`
 mode and will refuse to start without it.
 
 ## BIOS settings
 
-Two hidden BIOS settings (see [GUIDE.md](../GUIDE.md#5-bios-tweaks) for how to
+Two hidden BIOS settings (see [GUIDE.md](../GUIDE.md#2-bios-tweaks) for how to
 access them) affect how well thermald can do its job:
 
 **CFG Lock** -- thermald adjusts CPU power limits at runtime, and CFG Lock

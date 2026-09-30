@@ -13,7 +13,7 @@ uninstall:
 	ninja -C $(BUILDDIR) uninstall
 
 install-arch:
-	cd packaging/arch && makepkg -si
+	cd packaging/arch && makepkg -Csi
 
 clean:
 	rm -rf $(BUILDDIR)

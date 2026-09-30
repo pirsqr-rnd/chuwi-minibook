@@ -1,111 +1,40 @@
 # Installation Guide
 
-## Check current status
+Three steps: run the bootstrap script, flip two BIOS settings, install
+thermald. Reboot when done.
 
-Three diagnostic scripts in `tools/` cover different areas. Each produces a
-warnings section at the end that collects everything that needs fixing.
+This page covers the standard setup. For manual per-component installation,
+GPU setup, display rotation internals and sleep modes, see
+[GUIDE-ADVANCED.md](GUIDE-ADVANCED.md).
 
-### check-status.sh
+## 1. Run the bootstrap script
 
-General system and component status. Runs without root for most checks; root is
-only needed for the VBT section (debugfs).
-
-```
-sudo tools/check-status.sh
-```
-
-| Section            | What it checks                                                                  |
-| ------------------ | ------------------------------------------------------------------------------- |
-| **device**         | DMI vendor/product, CPU model, microcode, BIOS version, DSI display, sleep mode |
-| **kernel cmdline** | `i915.vbt_firmware` (custom VBT), `i915.enable_psr=0` (PSR fix)                 |
-| **vbt**            | Panel refresh rate from VBT Block 58 (needs `intel_vbt_decode` and sudo)        |
-| **prerequisites**  | Build tools: dkms, clang, curl, patch, meson, ninja, kernel headers             |
-| **modules**        | DKMS install state, loaded state, and boot config for each kernel module        |
-| **services**       | thermald and iio-sensor-proxy version, enabled/running state                    |
-
-### dptf-status.sh
-
-DPTF participant status and BIOS settings. Requires root (reads MSRs).
+On Ubuntu or Debian:
 
 ```
-sudo tools/dptf-status.sh
+sudo tools/bootstrap-ubuntu.sh
 ```
 
-| Section           | What it checks                                                                                                                                      |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **modules**       | dptf_enabler loaded/params, int3400_thermal, int340x_thermal_zone, intel_rapl_common                                                                |
-| **dptf manager**  | IETM presence via platform driver, data_vault, active policy UUID                                                                                   |
-| **participants**  | Each DPTF device (TCPU, SEN1-5, DGPU, TFN1-3, CHRG, TPWR, TPCH, BAT1): ACPI status and platform driver binding                                      |
-| **thermal zones** | Temps and trip points for zones thermald monitors (B0D4/TCPU, SEN3, minibook_soc, minibook_charger); shows `[thermald]` if under user_space control |
-| **rapl**          | PL1 from MMIO and MSR powercap, PPCC range from processor thermal PCI device                                                                        |
-| **bios settings** | CFG Lock (MSR 0xE2), RAPL PL1 writability, TCC Activation Offset (MSR 0x1A2)                                                                        |
-
-### gpu-status.sh
-
-GPU and media acceleration. Must be run as your normal user (not root).
+On Arch, CachyOS or Manjaro (with `sudo` from your normal user account, not
+from a root shell — it builds a package, which refuses to run as root):
 
 ```
-tools/gpu-status.sh
+sudo tools/bootstrap-arch.sh
 ```
 
-See [GPU and Vulkan](#gpu-and-vulkan) below for what it checks and how to set up
-GPU support.
+The script installs build dependencies, the four DKMS kernel modules
+(touchscreen fix, EC driver, DPTF enabler, I2C fix), the patched
+iio-sensor-proxy for auto-rotation and tablet mode, and the kernel command
+line arguments for display rotation, deep sleep and the PSR screen-tearing
+fix.
 
-______________________________________________________________________
+It is idempotent — safe to re-run at any time. If it stops with an error
+saying the running kernel is no longer installed, a package upgrade pulled in
+a new kernel: reboot and run it again.
 
-## Install
+## 2. BIOS tweaks
 
-Install components in this order to satisfy dependencies.
-
-Examples below assume **Limine + mkinitcpio** (the CachyOS default). On
-GRUB-based systems, edit `GRUB_CMDLINE_LINUX_DEFAULT` in `/etc/default/grub`
-instead of `/etc/default/limine`, and rebuild with
-`sudo update-grub && sudo update-initramfs -u` (Debian/Ubuntu) or
-`sudo grub2-mkconfig -o /boot/grub2/grub.cfg && sudo dracut -f` (Fedora) instead
-of `sudo limine-mkinitcpio`.
-
-### 1. dptf_enabler
-
-Unhides BIOS-gated Intel DPTF devices. Required by thermald.
-
-```
-cd modules/dptf_enabler
-sudo make install && sudo make enable
-```
-
-### 2. minibook_ec
-
-EC platform driver for thermal sensors, fan monitoring, keyboard backlight and
-input toggles. Required by thermald for its SoC and charger thermal zones.
-
-```
-cd modules/minibook_ec
-sudo make install && sudo make enable
-```
-
-Verify: `dmesg | grep minibook_ec`. See [minibook-ec.md](docs/minibook-ec.md)
-for sysfs interface documentation.
-
-### 3. i2c_designware_spklen
-
-I2C spike suppression fix. Prevents occasional touchscreen and sensor bus
-errors.
-
-```
-cd modules/i2c_designware_spklen
-sudo make install && sudo make enable
-```
-
-### 4. goodix_ts
-
-Touchscreen resume fix and OEM config loading.
-
-```
-cd modules/goodix_ts
-sudo make install && sudo make enable
-```
-
-### 5. BIOS tweaks
+thermald needs two hidden BIOS settings changed to control CPU power limits.
 
 1. Unlock the hidden BIOS menus:
    `echo 1 | sudo tee /sys/devices/platform/minibook_ec/bios_unlock`
@@ -118,12 +47,11 @@ sudo make install && sudo make enable
 1. Navigate to `Thermal Configuration -> CPU Thermal Configuration`
 1. Change `Tcc Activation Offset` to `10`
 
-These are needed for thermald to control CPU power limits. See
-[thermald.md](docs/thermald.md#bios-tweaks) for details.
+See [thermald.md](docs/thermald.md#bios-settings) for what these do.
 
-### 6. thermald
+## 3. thermald
 
-Patched thermal daemon. Requires steps 1-2 and 5 above.
+Patched thermal daemon. Requires steps 1 and 2.
 
 ```
 cd thermal_daemon
@@ -133,21 +61,19 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now thermald
 ```
 
-On Arch and Manjaro, use `make install-arch` instead - it builds via `makepkg`
+On Arch and Manjaro, use `make install-arch` instead — it builds via `makepkg`
 so pacman tracks the install. Add `IgnorePkg = thermald` to `/etc/pacman.conf`
 so upgrades don't replace it with the unpatched repo build.
 
-On Debian and Ubuntu, `sudo apt remove thermald` first so the distro package
-doesn't shadow the fork.
-
-On Fedora, `sudo dnf remove thermald` first for the same reason.
+On Debian and Ubuntu, `sudo apt remove thermald` first; on Fedora,
+`sudo dnf remove thermald` — so the distro package doesn't shadow the fork.
 
 Verify: `journalctl -u thermald | grep minibook`. See
-[thermald.md](docs/thermald.md) for patch details and tunable parameters.
+[thermald.md](docs/thermald.md) for details.
 
-### 7. iio-sensor-proxy
+## 4. Reboot and verify
 
-Screen rotation and tablet mode via dual accelerometers.
+Reboot, then run:
 
 Requires the `i2c-dev` and `acpi_call` kernel modules. Without `i2c-dev`, the
 MXC6655 driver cannot open `/dev/i2c-*` and the service exits immediately with
@@ -162,17 +88,14 @@ printf 'i2c-dev\nacpi_call\n' | sudo tee /etc/modules-load.d/iio-sensor-proxy.co
 ```
 
 ```
-cd iio-sensor-proxy
-make && sudo make install
-sudo systemctl restart iio-sensor-proxy
+sudo tools/check-status.sh
 ```
 
-On Arch and Manjaro, use `make install-arch` instead - it builds via `makepkg`
-so pacman tracks the install. Add `IgnorePkg = iio-sensor-proxy` to
-`/etc/pacman.conf` so upgrades don't replace it with the unpatched repo build.
+The warnings section at the end lists anything still missing. Two more status
+scripts dig deeper — see
+[GUIDE-ADVANCED.md](GUIDE-ADVANCED.md#status-scripts).
 
-On Debian and Ubuntu, `sudo apt remove iio-sensor-proxy` first so the distro
-package doesn't shadow the fork.
+## Optional: higher refresh rate
 
 On Fedora, `sudo dnf remove iio-sensor-proxy` first for the same reason.
 
@@ -243,29 +166,22 @@ Then use `update-vbt-clock.sh` to patch, install into the initramfs, and update
 the kernel command line in one step:
 
 ```
+cd vbt_patch && make && cd ..
 sudo tools/update-vbt-clock.sh 90
 ```
 
-This does the following:
-
-1. Reads the current VBT from debugfs
-1. Patches the pixel clock for the requested refresh rate
-1. Installs the patched VBT to `/lib/firmware/vbt`
-1. Adds the file to `mkinitcpio.conf` so it is included in the initramfs
-1. Adds `i915.vbt_firmware=vbt` to the Limine kernel command line
-1. Rebuilds the initramfs
-
-Reboot to apply. If the display flickers or shows artifacts, your panel does not
-support that rate - revert and try a lower value:
+**Treat this as an experiment, not a default.** Panels vary between units, and
+a rate can survive a cold boot yet fail on the first suspend/resume. Test a
+suspend cycle before relying on it, and revert if the display misbehaves:
 
 ```
 sudo tools/update-vbt-clock.sh --revert
 ```
 
-See [vbt-patch.md](docs/vbt-patch.md) for the full tool reference and guidance
-on choosing a refresh rate.
+See [vbt-patch.md](docs/vbt-patch.md) for choosing a rate and telling the two
+failure modes apart.
 
-______________________________________________________________________
+## Optional: screen auto-rotation on other desktops
 
 ## GPU and Vulkan
 

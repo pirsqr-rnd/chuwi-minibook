@@ -60,6 +60,13 @@ show the new refresh rate.
 
 ## What rate to use
 
+> **Treat the refresh-rate patch as an experiment, not a default.** Panels vary
+> between units, and a rate can run cleanly for hours from a cold boot and still
+> fail on the first suspend/resume, taking a revert and a reboot to clear and
+> leaving temporary image retention behind. Suspend-test before relying on it,
+> and see "What rate to use" below. This is why the patch is not part of the
+> `bootstrap-ubuntu.sh` / `bootstrap-arch.sh` scripts.
+
 The stock rate is 50 Hz. Try 90 Hz first -- it is a noticeable improvement in
 smoothness and works on most MiniBook X units:
 
@@ -68,12 +75,42 @@ sudo update-vbt-clock 90
 ```
 
 Not all units ship with the exact same panel, so 90 Hz may not work on yours. If
-you see flickering, color banding, or horizontal lines after rebooting, your
-panel does not support that rate -- revert and try a lower value:
+you see flickering, color banding, or horizontal lines after rebooting, **first
+check the desktop is actually running at the patched rate**. The panel has a
+single timing descriptor, so patching replaces the old rate rather than adding a
+new one: a saved display configuration (e.g. GNOME's `~/.config/monitors.xml`)
+that still pins the pre-patch rate now references a mode that no longer exists,
+and the compositor silently falls back to a driver-synthesised mode. The panel
+is then programmed for one rate and scanned out at another, which produces
+exactly these artifacts. Immediately after patching, any saved config is
+guaranteed stale, so this is the more likely cause. Select the new rate in
+display settings and the artifacts should clear.
+
+Only if the artifacts persist while running at the patched rate does the panel
+not support it -- revert and try a lower value:
 
 ```
 sudo update-vbt-clock --revert
 ```
+
+**Test a suspend/resume cycle before considering a rate proven.** A cold boot is
+not a sufficient test: the DSI link is brought up from scratch at boot but is
+re-trained on resume, so a panel that is marginal at the requested clock can run
+for hours from cold and then fail the moment the lid is reopened. The symptom is
+distinctive and much more severe than the mismatch artifacts above: roughly half
+the scanlines missing entirely, with horizontal light-trail smearing on the
+rest.
+
+Two things make that failure mode easy to misread. The driver logs nothing at
+all -- no FIFO underruns, no link errors, no atomic commit failures -- so the
+kernel believes it is driving the panel correctly. And because it is not the
+stale-config problem above, the mode really is the patched one, so the first
+check passes and points the wrong way. Forcing a fresh modeset does not clear
+it; only reverting does.
+
+Prolonged operation in that state can leave image retention on the panel,
+visible as faint marks against black. On an LCD this is normally temporary and
+fades over hours or days.
 
 If the display does not come up at all after a reboot, the kernel falls back to
 the BIOS VBT (50 Hz) automatically when the firmware file is missing or corrupt.
@@ -140,13 +177,15 @@ The `update-vbt-clock` script automates the full workflow:
 1. Reads the current VBT from `/sys/kernel/debug/dri/0000:00:02.0/i915_vbt`
 1. Runs `vbt_patch --hz <rate>` to produce a patched copy
 1. Installs the patched VBT to `/lib/firmware/vbt`
-1. Adds `/lib/firmware/vbt` to `mkinitcpio.conf` so it is included in the
-   initramfs
+1. Registers `/lib/firmware/vbt` with the initramfs generator (`FILES` in
+   `mkinitcpio.conf`, a dracut drop-in, or an initramfs-tools hook) so it is
+   included in the initramfs
 1. Adds `i915.vbt_firmware=vbt` to the kernel command line
-1. Rebuilds the initramfs
+1. Rebuilds the initramfs and, under GRUB, the bootloader config
 
-`--revert` removes the kernel parameter. The patched VBT file remains in
-`/lib/firmware/vbt` but is ignored without the kernel parameter.
+`--revert` removes the patched VBT, its initramfs registration and the kernel
+parameter, then rebuilds the initramfs so the stock VBT is used again.
 
-The script currently supports Limine (`/etc/default/limine`) as the bootloader
-and mkinitcpio for initramfs generation.
+The script supports Limine (`/etc/default/limine`) and GRUB
+(`/etc/default/grub`) as bootloaders, and mkinitcpio, dracut and
+initramfs-tools for initramfs generation.

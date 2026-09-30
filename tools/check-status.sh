@@ -408,6 +408,16 @@ check_prereqs() {
 
 # --- modules ---
 
+# Scope the query to the running kernel: versions left over from earlier kernels
+# are still listed as installed and would answer for the wrong build.
+installed_dkms_version() {
+  local dkms_name="$1"
+
+  dkms status -m "${dkms_name}" -k "$(uname -r)" 2>/dev/null \
+    | grep 'installed' | head -1 \
+    | awk -F'[,/]' '{print $2}' | tr -d ' ' || true
+}
+
 check_module() {
   local dkms_name="$1"
   local expect_pattern="${2-}"
@@ -415,9 +425,7 @@ check_module() {
   printf "%-24s" "${dkms_name}"
 
   local dkms_ver
-  dkms_ver="$(dkms status -m "${dkms_name}" 2>/dev/null \
-    | grep 'installed' | head -1 \
-    | awk -F'[,/]' '{print $2}' | tr -d ' ' || true)"
+  dkms_ver="$(installed_dkms_version "${dkms_name}")"
 
   if [[ -z "${dkms_ver}" ]]; then
     echo "NOT INSTALLED"
