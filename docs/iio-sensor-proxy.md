@@ -103,9 +103,9 @@ toggling via ACPI is skipped -- `SW_TABLET_MODE` is still emitted via uinput,
 so most compositors still disable keyboard input at the libinput level, just
 not at the EC level.
 
-Neither module is loaded by default on most distros. Load them and add to
-`/etc/modules-load.d/` for them to persist across reboots -- see
-[GUIDE.md](../GUIDE.md#7-iio-sensor-proxy).
+Neither module is loaded by default on most distros. `bootstrap-arch.sh` loads
+`acpi_call` automatically; if `i2c-dev` still isn't loaded, see
+[GUIDE.md](../GUIDE.md#4-reboot-and-verify) for how to load and persist it.
 
 ## Verify
 

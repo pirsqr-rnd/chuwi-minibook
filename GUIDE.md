@@ -75,18 +75,6 @@ Verify: `journalctl -u thermald | grep minibook`. See
 
 Reboot, then run:
 
-Requires the `i2c-dev` and `acpi_call` kernel modules. Without `i2c-dev`, the
-MXC6655 driver cannot open `/dev/i2c-*` and the service exits immediately with
-"No sensors or missing kernel drivers for the sensors". `acpi_call` is needed
-for the EC-level keyboard/touchpad toggle in tablet mode (screen rotation
-itself works without it). Load both and make them persistent:
-
-```
-sudo pacman -S acpi_call-dkms   # or your distro's acpi_call package
-sudo modprobe i2c-dev acpi_call
-printf 'i2c-dev\nacpi_call\n' | sudo tee /etc/modules-load.d/iio-sensor-proxy.conf
-```
-
 ```
 sudo tools/check-status.sh
 ```
@@ -94,6 +82,20 @@ sudo tools/check-status.sh
 The warnings section at the end lists anything still missing. Two more status
 scripts dig deeper — see
 [GUIDE-ADVANCED.md](GUIDE-ADVANCED.md#status-scripts).
+
+If iio-sensor-proxy logs `No sensors or missing kernel drivers for the
+sensors`, the `i2c-dev` kernel module isn't loaded -- `bootstrap-arch.sh`
+enables `acpi_call` automatically but not `i2c-dev`. Load it and make it
+persistent:
+
+```
+sudo modprobe i2c-dev
+echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf
+sudo systemctl restart iio-sensor-proxy
+```
+
+See [iio-sensor-proxy.md](docs/iio-sensor-proxy.md#runtime-requirements) for
+details.
 
 ## Optional: screen auto-rotation on other desktops
 
