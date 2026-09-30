@@ -517,6 +517,83 @@ so rotation needs the same kind of manual, per-panel config Weston did.
 
 </details>
 
+**The VT-switch flash also happens with `noctalia-greeter`, and it is
+actually fixable.** The brief flash of text isn't a generic "two compositors
+handing off a VT" artifact after all -- it's one specific deprecation warning
+from `/usr/bin/niri-session` (part of the `niri` package, not a custom
+config): the line `systemctl --user import-environment` (called with no
+variable-name list) prints `calling import-environment without a list of
+variable names is deprecated` on stderr. This happens while `niri-session` is
+still a plain shell script running directly on the raw VT, before Niri itself
+grabs the display, so the warning never reaches `journalctl` -- it goes
+straight to the physical console, which is what actually flashes.
+
+Confirmed live that this is the actual cause -- it reproduces identically
+with and without the intermittent Niri panic below, so the panic was never
+what caused the flash.
+
+Already reported upstream: this is a known, long-standing issue
+([niri-wm/niri#254](https://github.com/niri-wm/niri/issues/254), open since
+March 2024). The maintainer has explicitly declined to change the default
+(`"we're not gonna replace a 1 line command with something complicated just
+to hide this warning message"`), so don't re-report it -- patch locally
+instead, which the maintainer also explicitly endorses in that thread
+("you could also patch niri-session or make your own version, it's not too
+complex a script").
+
+Fixed via a **pacman hook** (borrowed from a fix shared in that issue by
+`real-or-random`) rather than a one-off edit, so it survives `niri` package
+updates automatically instead of needing manual reapplication after every
+upgrade:
+
+```
+# /etc/pacman.d/hooks/niri-import-environment-patch.hook
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = niri
+
+[Action]
+Description = Patch niri-session import-environment deprecation warning
+When = PostTransaction
+Exec = /usr/bin/env sed -i "s@ systemctl --user import-environment$@ # HACK: The following line has been automatically patched by a pacman hook\n SYSTEMD_COLORS=true systemctl --user import-environment 2>\&1 | grep -v 'Calling import-environment without a list of variable names is deprecated.'@" /usr/bin/niri-session
+```
+
+The hook only fires on a package transaction, so it doesn't touch an
+already-installed `niri-session` -- apply the same `sed` once by hand after
+installing the hook to patch the current install immediately. A pristine
+backup of the original script is kept at
+`/usr/bin/niri-session.orig-pre-import-env-fix` for reference/diffing.
+
+Note there's a second, more thorough fix discussed in the same issue: pass
+an explicit variable list (`systemctl --user import-environment PATH
+XDG_SESSION_ID`) instead of suppressing the warning. Several users report the
+bare, no-args form also permanently clobbers variables set via
+`~/.config/environment.d/*.conf` (systemd puts imported vars in an override
+layer that survives later environment.d changes). Not observed on this
+machine and not worth the extra complexity unless `environment.d` ends up in
+use here.
+
+**Separate, unrelated finding: Niri sometimes panics on session quit.**
+Reproduced once (2026-09-20 ~09:50) when returning to the greeter via
+`CTRL+ALT+Delete { quit; }`:
+
+```
+seatd: [ERROR] Could not revoke evdev on device fd: No such device
+niri: thread 'main' panicked at .../smithay/src/backend/session/libseat.rs:215:57:
+niri: called `Result::unwrap()` on an `Err` value: Errno { code: 107, description: "Transport endpoint is not connected" }
+niri.service: Main process exited, code=exited, status=101/n/a
+```
+
+Intermittent -- a later identical quit exited cleanly (`status 0`, plain
+`seatd: Client disconnected` INFO line, no panic). Looks like a race in
+Smithay's libseat session backend during teardown (`.unwrap()` on a seat
+disconnect that should be handled gracefully), not a config issue on this
+machine. Not the cause of the console flash above. Worth an upstream report
+if it recurs enough to be annoying; functionally harmless so far (the session
+still ends either way).
+
 ### DSI link tearing
 
 Panel Self Refresh (PSR) can cause DSI link tearing on this panel - the screen
