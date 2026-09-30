@@ -95,9 +95,7 @@ The warnings section at the end lists anything still missing. Two more status
 scripts dig deeper — see
 [GUIDE-ADVANCED.md](GUIDE-ADVANCED.md#status-scripts).
 
-## Optional: higher refresh rate
-
-On Fedora, `sudo dnf remove iio-sensor-proxy` first for the same reason.
+## Optional: screen auto-rotation on other desktops
 
 The proxy exposes orientation on D-Bus (`net.hadess.SensorProxy`). How that
 becomes a screen rotation depends on your desktop:
@@ -152,7 +150,7 @@ switch-events {
 ń ó ś ź ż) is reachable through the "Cmp" (Compose) key: tap `Cmp`, then the
 base letter, then pick the accented variant from the popup that appears.
 
-### 8. VBT patcher (display refresh rate)
+## Optional: higher refresh rate
 
 The stock DSI panel runs at 50 Hz. The VBT patcher changes the pixel clock to
 increase the refresh rate. Build the tool first:
@@ -166,9 +164,17 @@ Then use `update-vbt-clock.sh` to patch, install into the initramfs, and update
 the kernel command line in one step:
 
 ```
-cd vbt_patch && make && cd ..
 sudo tools/update-vbt-clock.sh 90
 ```
+
+This does the following:
+
+1. Reads the current VBT from debugfs
+1. Patches the pixel clock for the requested refresh rate
+1. Installs the patched VBT to `/lib/firmware/vbt`
+1. Adds the file to `mkinitcpio.conf` so it is included in the initramfs
+1. Adds `i915.vbt_firmware=vbt` to the Limine kernel command line
+1. Rebuilds the initramfs
 
 **Treat this as an experiment, not a default.** Panels vary between units, and
 a rate can survive a cold boot yet fail on the first suspend/resume. Test a
@@ -180,8 +186,6 @@ sudo tools/update-vbt-clock.sh --revert
 
 See [vbt-patch.md](docs/vbt-patch.md) for choosing a rate and telling the two
 failure modes apart.
-
-## Optional: screen auto-rotation on other desktops
 
 ## GPU and Vulkan
 
@@ -231,7 +235,8 @@ link tearing.
 ### Display rotation
 
 If your compositor consumes iio-sensor-proxy orientation events (see
-[§7](#7-iio-sensor-proxy) for the per-desktop list), you do not need any of the
+[the section above](#optional-screen-auto-rotation-on-other-desktops) for the
+per-desktop list), you do not need any of the
 methods below. The patched proxy reports `right-up` in laptop mode so the
 compositor applies the 270° rotation dynamically, and switches to live
 accelerometer rotation in tablet mode. There is nothing to configure on the
@@ -292,7 +297,7 @@ vbt_patch <input> --rotation 1 <output>
 
 The rotation values are: 0 = 0 degrees, 1 = 90 degrees, 2 = 180 degrees, 3 = 270
 degrees. This is a firmware-level change embedded in the initramfs (see
-[VBT patcher](#8-vbt-patcher-display-refresh-rate) above). It can be combined
+[VBT patcher](#optional-higher-refresh-rate) above). It can be combined
 with a refresh rate patch in a single `vbt_patch` invocation.
 
 #### Xrandr
